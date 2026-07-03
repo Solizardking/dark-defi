@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌑 Dark DeFi Terminal | Privacy-First Trading</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --surface2: #1a1a2e;
+            --border: #1e1e36;
+            --purple: #b366ff;
+            --cyan: #00fff9;
+            --pink: #ff0080;
+            --green: #39ff14;
+            --yellow: #ffb800;
+            --text: #e0e0e0;
+            --text2: #a0a0a0;
+            --dim: #606060;
+        }
+
+        body {
+            font-family: 'Courier New', 'Consolas', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scanline overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 249, 0.015) 2px,
+                rgba(0, 255, 249, 0.015) 4px
+            );
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* ── Layout ── */
+        .app { display: flex; flex-direction: column; height: 100vh; }
+
+        header {
+            background: var(--surface);
+            border-bottom: 2px solid var(--purple);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            box-shadow: 0 0 30px rgba(179,102,255,0.25);
+        }
+
+        .brand {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+        }
+
+        .brand h1 {
+            font-size: 22px;
+            font-weight: bold;
+            background: linear-gradient(90deg, var(--purple), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: glow 2.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: brightness(1) drop-shadow(0 0 6px var(--purple)); }
+            to   { filter: brightness(1.3) drop-shadow(0 0 16px var(--cyan)); }
+        }
+
+        .brand .sub {
+            font-size: 12px;
+            color: var(--dim);
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 11px;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 4px 10px;
+        }
+
+        .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .dot.green  { background: var(--green);  box-shadow: 0 0 8px var(--green); }
+        .dot.purple { background: var(--purple); box-shadow: 0 0 8px var(--purple); }
+        .dot.red    { background: var(--pink);   box-shadow: 0 0 8px var(--pink); }
+        .dot.yellow { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        nav {
+            display: flex;
+            gap: 2px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 16px;
+            flex-shrink: 0;
+        }
+
+        .tab {
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--text2);
+            padding: 10px 18px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            transition: all 0.2s;
+        }
+
+        .tab:hover  { color: var(--text); background: rgba(255,255,255,0.04); }
+        .tab.active { color: var(--purple); border-bottom-color: var(--purple); }
+
+        .main {
+            flex: 1;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 0;
+        }
+
+        @media (max-width: 1100px) {
+            .main { grid-template-columns: 1fr; }
+            .sidebar { display: none; }
+        }
+
+        .content-area {
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .sidebar {
+            border-left: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 16px;
+            background: var(--surface);
+        }
+
+        /* ── Panel ── */
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 18px;
+            margin-bottom: 16px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-title {
+            color: var(--cyan);
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.06em;
+        }
+
+        /* ── Chat ── */
+        .chat-log {
+            height: calc(100vh - 310px);
+            min-height: 300px;
+            overflow-y: auto;
+            padding: 8px 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chat-log::-webkit-scrollbar       { width: 6px; }
+        .chat-log::-webkit-scrollbar-track { background: var(--bg); }
+        .chat-log::-webkit-scrollbar-thumb { background: var(--purple); border-radius: 3px; }
+
+        .msg {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            animation: fadein 0.25s ease;
+        }
+
+        @keyframes fadein { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:none } }
+
+        .msg-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--dim);
+        }
+
+        .avatar {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+        }
+
+        .avatar.user  { background: var(--purple); }
+        .avatar.agent { background: var(--surface2); border: 1px solid var(--cyan); }
+
+        .msg-body {
+            background: rgba(255,255,255,0.04);
+            border-left: 2px solid var(--border);
+            padding: 10px 14px;
+            border-radius: 0 6px 6px 0;
+            font-size: 13px;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .msg-body.user  { border-left-color: var(--purple); }
+        .msg-body.agent { border-left-color: var(--cyan); }
+        .msg-body.error { border-left-color: var(--pink); color: var(--pink); }
+
+        .msg-body code {
+            background: rgba(0,0,0,0.5);
+            padding: 1px 5px;
+            border-radius: 3px;
+            color: var(--green);
+            font-size: 12px;
+        }
+
+        .provider-badge {
+            font-size: 10px;
+            background: rgba(0,255,249,0.1);
+            color: var(--cyan);
+            padding: 2px 6px;
+            border-radius: 10px;
+            border: 1px solid rgba(0,255,249,0.2);
+        }
+
+        /* ── Input row ── */
+        .input-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 11px 14px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .chat-input:focus {
+            border-color: var(--purple);
+            box-shadow: 0 0 12px rgba(179,102,255,0.25);
+        }
+
+        .send-btn {
+            background: var(--purple);
+            border: none;
+            color: var(--bg);
+            padding: 11px 22px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 0.06em;
+            transition: all 0.2s;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            box-shadow: 0 0 20px var(--purple);
+            transform: translateY(-1px);
+        }
+
+        .send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* ── Spinner ── */
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(179,102,255,0.3);
+            border-top-color: var(--purple);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Example cards (sidebar) ── */
+        .ex-card {
+            background: rgba(0,0,0,0.25);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ex-card:hover {
+            border-color: var(--purple);
+            box-shadow: 0 0 12px rgba(179,102,255,0.18);
+        }
+
+        .ex-title { color: var(--cyan); font-size: 13px; font-weight: bold; margin-bottom: 5px; }
+        .ex-desc  { color: var(--text2); font-size: 11px; margin-bottom: 8px; }
+
+        .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+
+        .tag {
+            background: rgba(179,102,255,0.15);
+            color: var(--purple);
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
+
+        /* ── Docs ── */
+        .doc-block { margin-bottom: 24px; }
+        .doc-block h3 { color: var(--cyan); font-size: 15px; margin-bottom: 8px; }
+        .doc-block p  { color: var(--text2); font-size: 13px; line-height: 1.65; white-space: pre-line; }
+
+        /* ── Stats ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat {
+            background: rgba(0,0,0,0.3);
+            border-left: 3px solid var(--purple);
+            padding: 12px;
+            border-radius: 4px;
+        }
+
+        .stat-label { color: var(--dim); font-size: 10px; letter-spacing: 0.1em; margin-bottom: 4px; }
+        .stat-value { color: var(--cyan); font-size: 20px; font-weight: bold; }
+
+        .act-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .act-btn {
+            background: rgba(179,102,255,0.08);
+            border: 1px solid var(--purple);
+            color: var(--purple);
+            padding: 11px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .act-btn:hover {
+            background: rgba(179,102,255,0.18);
+            box-shadow: 0 0 12px rgba(179,102,255,0.25);
+        }
+
+        /* ── Config panel ── */
+        .cfg-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+
+        .cfg-row:last-child { border-bottom: none; }
+        .cfg-key   { color: var(--text2); }
+        .cfg-val   { color: var(--cyan); font-weight: bold; }
+        .cfg-ok    { color: var(--green); }
+        .cfg-miss  { color: var(--pink); }
+
+        /* ── Perps table ── */
+        .perps-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .perps-table th {
+            color: var(--dim);
+            font-weight: bold;
+            letter-spacing: 0.08em;
+            padding: 6px 10px;
+            text-align: right;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .perps-table th:first-child { text-align: left; }
+
+        .perps-table td {
+            padding: 7px 10px;
+            text-align: right;
+            border-bottom: 1px solid rgba(30,30,54,0.6);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .perps-table td:first-child { text-align: left; color: var(--cyan); font-weight: bold; }
+
+        .perps-table tr:hover td { background: rgba(179,102,255,0.06); }
+
+        .pos  { color: var(--green); }
+        .neg  { color: var(--pink);  }
+        .neu  { color: var(--text2); }
+
+        /* ── Orderbook ── */
+        .ob-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .ob-side { font-size: 11px; }
+        .ob-side-title { color: var(--dim); letter-spacing: .08em; margin-bottom: 6px; font-size: 10px; }
+
+        .ob-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(30,30,54,0.4);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .ob-bid .ob-row-price { color: var(--green); }
+        .ob-ask .ob-row-price { color: var(--pink);  }
+
+        /* ── Candle spark ── */
+        .candle-bar-wrap {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 60px;
+            margin-top: 8px;
+        }
+
+        .candle-bar {
+            flex: 1;
+            border-radius: 2px 2px 0 0;
+            min-height: 2px;
+        }
+
+        /* ── Alert banners ── */
+        .banner {
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-bottom: 12px;
+        }
+
+        .banner.warn  { background: rgba(255,184,0,0.1);  border: 1px solid var(--yellow); color: var(--yellow); }
+        .banner.error { background: rgba(255,0,128,0.1);  border: 1px solid var(--pink);   color: var(--pink); }
+        .banner.ok    { background: rgba(57,255,20,0.1);  border: 1px solid var(--green);  color: var(--green); }
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <!-- ── Header ── -->
+    <header>
+        <div class="brand">
+            <h1>🌑 DARK DEFI TERMINAL</h1>
+            <span class="sub">Privacy-First Trading on Solana</span>
+        </div>
+        <div class="status-bar" id="statusBar">
+            <div class="status-pill">
+                <div class="dot yellow" id="serverDot"></div>
+                <span id="serverLabel">connecting…</span>
+            </div>
+            <div class="status-pill">
+                <div class="dot purple" id="aiDot"></div>
+                <span id="aiLabel">AI: …</span>
+            </div>
+            <div class="status-pill">
+                <div class="dot green" id="netDot"></div>
+                <span id="netLabel">devnet</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ── Nav tabs ── -->
+    <nav>
+        <button class="tab active" data-tab="agent">🤖 AI AGENT</button>
+        <button class="tab" data-tab="perps">📈 PERPS</button>
+        <button class="tab" data-tab="docs">📚 DOCS</button>
+        <button class="tab" data-tab="stats">📊 STATS</button>
+        <button class="tab" data-tab="config">⚙️ CONFIG</button>
+    </nav>
+
+    <!-- ── Main layout ── -->
+    <div class="main">
+        <div class="content-area" id="contentArea">
+            <!-- injected by JS -->
+        </div>
+        <aside class="sidebar" id="sidebar">
+            <!-- injected by JS -->
+        </aside>
+    </div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────────────
+// Config & state
+// ─────────────────────────────────────────────────
+const API_BASE = window.location.origin; // hits the local server
+let serverConfig = null;
+let chatHistory = []; // [{role,content}]
+
+// ─────────────────────────────────────────────────
+// Boot — fetch server config
+// ─────────────────────────────────────────────────
+async function boot() {
+    try {
+        const r = await fetch(API_BASE + '/api/config');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        serverConfig = await r.json();
+
+        // Update status bar
+        document.getElementById('serverDot').className = 'dot green';
+        document.getElementById('serverLabel').textContent = 'server: online';
+        document.getElementById('netLabel').textContent = serverConfig.network ?? 'devnet';
+
+        const aiOk = serverConfig.hasGoogleAI || serverConfig.hasXAI || serverConfig.hasRedPill;
+        document.getElementById('aiDot').className = 'dot ' + (aiOk ? 'green' : 'yellow');
+        document.getElementById('aiLabel').textContent = aiOk
+            ? (serverConfig.hasGoogleAI ? 'Gemini' : serverConfig.hasXAI ? 'Grok' : 'RedPill')
+            : 'AI: fallback';
+
+    } catch (e) {
+        document.getElementById('serverDot').className = 'dot red';
+        document.getElementById('serverLabel').textContent = 'server: offline';
+        document.getElementById('aiDot').className = 'dot red';
+        document.getElementById('aiLabel').textContent = 'AI: unavailable';
+        console.warn('Cannot reach local server:', e.message);
+    }
+
+    renderTab(currentTab);
+}
+
+// ─────────────────────────────────────────────────
+// Tab routing
+// ─────────────────────────────────────────────────
+let currentTab = 'agent';
+
+document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTab = btn.dataset.tab;
+        renderTab(currentTab);
+    });
+});
+
+function renderTab(tab) {
+    const content = document.getElementById('contentArea');
+    const sidebar = document.getElementById('sidebar');
+
+    if (tab === 'agent') {
+        content.innerHTML = buildAgentTab();
+        sidebar.innerHTML = buildSidebar();
+        bindChatEvents();
+        scrollChatToBottom();
+    } else if (tab === 'perps') {
+        content.innerHTML = buildPerpsTab();
+        sidebar.innerHTML = buildPerpsSidebar();
+        loadPerpsData();
+    } else if (tab === 'docs') {
+        content.innerHTML = buildDocsTab();
+        sidebar.innerHTML = '';
+    } else if (tab === 'stats') {
+        content.innerHTML = buildStatsTab();
+        sidebar.innerHTML = buildPrivacyPanel();
+    } else if (tab === 'config') {
+        content.innerHTML = buildConfigTab();
+        sidebar.innerHTML = '';
+    }
+}
+
+// ─────────────────────────────────────────────────
+// Chat tab
+// ─────────────────────────────────────────────────
+const INITIAL_MESSAGE = {
+    role: 'agent',
+    content: `🌑 Dark DeFi Agent online.
+
+I'm your privacy-first DeFi assistant with deep knowledge of the Dark Protocol on Solana.
+
+Ask me about:
+• Shielded wallets & Zcash cryptography
+• Private transfers & note encryption
+• FHE encrypted trading & dark pools
+• TEE-secured AI agents
+• Cross-chain bridges (ETH → Solana)
+• Viewing keys & compliance
+
+Or click an example in the sidebar →`,
+    time: new Date()
+};
+
+if (chatHistory.length === 0) chatHistory.push(INITIAL_MESSAGE);
+
+function buildAgentTab() {
+    const msgs = chatHistory.map(m => renderMsg(m)).join('');
+    return `
+    <div class="panel" style="height: calc(100vh - 170px); display:flex; flex-direction:column;">
+        <div class="panel-header">
+            <div class="panel-title">🤖 Dark DeFi Agent</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span class="provider-badge" id="provBadge">-</span>
+                <div class="dot green"></div>
+                <span style="font-size:11px;color:var(--dim)">ONLINE</span>
+            </div>
+        </div>
+        <div class="chat-log" id="chatLog">${msgs}</div>
+        <div class="input-row">
+            <input type="text" class="chat-input" id="chatInput"
+                   placeholder="Ask about Dark Protocol…" autocomplete="off"/>
+            <button class="send-btn" id="sendBtn">SEND</button>
+        </div>
+    </div>`;
+}
+
+function renderMsg(m) {
+    const isAgent = m.role === 'agent';
+    const name = isAgent ? 'Dark Agent' : 'You';
+    const avatarEmoji = isAgent ? '🌑' : '👤';
+    const cls = m.error ? 'error' : m.role;
+    const time = m.time ? new Date(m.time).toLocaleTimeString() : '';
+    const badge = m.provider ? `<span class="provider-badge">${m.provider}</span>` : '';
+    return `
+    <div class="msg">
+        <div class="msg-header">
+            <div class="avatar ${m.role}">${avatarEmoji}</div>
+            <strong style="font-size:12px;color:var(--text2)">${name}</strong>
+            <span>${time}</span>
+            ${badge}
+        </div>
+        <div class="msg-body ${cls}">${escHtml(m.content)}</div>
+    </div>`;
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function scrollChatToBottom() {
+    const log = document.getElementById('chatLog');
+    if (log) log.scrollTop = log.scrollHeight;
+}
+
+function bindChatEvents() {
+    const input = document.getElementById('chatInput');
+    const btn = document.getElementById('sendBtn');
+    if (!input || !btn) return;
+
+    btn.addEventListener('click', doSend);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
+    });
+}
+
+async function doSend() {
+    const input = document.getElementById('chatInput');
+    const btn = document.getElementById('sendBtn');
+    const log = document.getElementById('chatLog');
+    if (!input || !btn || !log) return;
+
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = '';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+
+    chatHistory.push({ role: 'user', content: text, time: new Date() });
+
+    // Append user message
+    const userEl = document.createElement('div');
+    userEl.innerHTML = renderMsg(chatHistory.at(-1));
+    log.appendChild(userEl.firstElementChild);
+    scrollChatToBottom();
+
+    // Thinking placeholder
+    const thinkEl = document.createElement('div');
+    thinkEl.className = 'msg';
+    thinkEl.id = 'thinking';
+    thinkEl.innerHTML = `
+        <div class="msg-header">
+            <div class="avatar agent">🌑</div>
+            <strong style="font-size:12px;color:var(--text2)">Dark Agent</strong>
+            <span class="spinner"></span>
+        </div>
+        <div class="msg-body agent">Thinking…</div>`;
+    log.appendChild(thinkEl);
+    scrollChatToBottom();
+
+    // Build messages for API
+    const systemContent = `You are the Dark DeFi Agent — an expert on the Dark Protocol, a privacy-first DeFi metaprotocol on Solana.
+
+Your expertise covers:
+- Zcash Sapling cryptography ported to Solana (zk-SNARKs, Pedersen commitments, nullifiers)
+- Fully Homomorphic Encryption (FHE) for encrypted DeFi computations
+- Shielded wallets with unlimited diversified addresses (ZIP-32 HD derivation)
+- Private transfers using ChaCha20-Poly1305 note encryption
+- Dark pools with MEV-resistant order matching
+- Encrypted assets: eSOL, eBTC, eETH, eUSDC
+- TEE-secured AI agents with on-chain attestation
+- Cross-chain bridges (Ethereum, Bitcoin → Solana)
+- View keys and selective disclosure for compliance
+
+Be precise, technical but accessible. Include TypeScript code snippets when helpful. Always emphasize privacy guarantees.`;
+
+    const apiMessages = [
+        { role: 'system', content: systemContent },
+        ...chatHistory.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10).map(m => ({
+            role: m.role === 'agent' ? 'assistant' : 'user',
+            content: m.content
+        }))
+    ];
+
+    try {
+        const r = await fetch(API_BASE + '/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: apiMessages })
+        });
+
+        const data = await r.json();
+        const agentMsg = {
+            role: 'agent',
+            content: data.reply ?? data.error ?? 'No response.',
+            provider: data.provider,
+            error: !!data.error && !data.reply,
+            time: new Date()
+        };
+        chatHistory.push(agentMsg);
+
+        // Update provider badge
+        const badge = document.getElementById('provBadge');
+        if (badge && data.provider) badge.textContent = data.provider;
+
+        // Replace thinking with real reply
+        thinkEl.innerHTML = renderMsg(agentMsg);
+        thinkEl.removeAttribute('id');
+
+    } catch (e) {
+        const errMsg = { role: 'agent', content: '⚠️ Network error: ' + e.message, error: true, time: new Date() };
+        chatHistory.push(errMsg);
+        thinkEl.innerHTML = renderMsg(errMsg);
+        thinkEl.removeAttribute('id');
+    }
+
+    scrollChatToBottom();
+    btn.disabled = false;
+    btn.innerHTML = 'SEND';
+    input.focus();
+}
+
+// ─────────────────────────────────────────────────
+// Sidebar — examples
+// ─────────────────────────────────────────────────
+const EXAMPLES = [
+    {
+        title: '🛡️ Shielded Wallet',
+        desc: 'Create privacy-preserving wallets with Zcash-style addresses',
+        tags: ['Wallet', 'Privacy', 'Zcash'],
+        prompt: 'Show me how to create a shielded wallet with diversified addresses using the Dark Protocol SDK'
+    },
+    {
+        title: '🔒 Private Transfer',
+        desc: 'Send tokens without revealing sender, receiver, or amount',
+        tags: ['Transfer', 'Encryption'],
+        prompt: 'How does private transfer note encryption work in Dark Protocol? Show me the code.'
+    },
+    {
+        title: '🌑 Dark Pool Trade',
+        desc: 'Trade with encrypted liquidity and MEV protection',
+        tags: ['DEX', 'MEV', 'FHE'],
+        prompt: 'Explain how dark pool trading works and how it prevents MEV attacks'
+    },
+    {
+        title: '🔐 FHE Operations',
+        desc: 'Compute on encrypted data without decryption',
+        tags: ['FHE', 'Encryption'],
+        prompt: 'What FHE operations does Dark Protocol support? Show me add, multiply, compare examples.'
+    },
+    {
+        title: '🤖 TEE AI Agent',
+        desc: 'Autonomous trading in a Trusted Execution Environment',
+        tags: ['AI', 'TEE'],
+        prompt: 'How do I deploy a TEE-secured AI trading agent? What attestation does it provide?'
+    },
+    {
+        title: '🌉 Cross-Chain Bridge',
+        desc: 'One-tx deposits from Ethereum & Bitcoin to Solana',
+        tags: ['Bridge', 'Multi-Chain'],
+        prompt: 'How does the cross-chain bridge work? Can I bridge ETH and BTC to Solana privately?'
+    },
+    {
+        title: '👁️ View Keys',
+        desc: 'Share read-only access for audit without spending access',
+        tags: ['Compliance', 'Audit'],
+        prompt: 'What are view keys and how do I share them for compliance auditing?'
+    },
+    {
+        title: '💎 eAssets',
+        desc: 'Wrap tokens into privacy-preserving encrypted form',
+        tags: ['eSOL', 'eBTC', 'eETH'],
+        prompt: 'How do I wrap SOL into eSOL and use it in DeFi protocols?'
+    }
+];
+
+function buildSidebar() {
+    return `
+    <div style="font-size:12px;color:var(--dim);margin-bottom:12px;letter-spacing:.08em;">
+        ⚡ QUICK EXAMPLES
+    </div>
+    ${EXAMPLES.map((ex, i) => `
+    <div class="ex-card" data-idx="${i}">
+        <div class="ex-title">${ex.title}</div>
+        <div class="ex-desc">${ex.desc}</div>
+        <div class="tags">${ex.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+    </div>`).join('')}`;
+}
+
+document.getElementById('sidebar').addEventListener('click', e => {
+    const card = e.target.closest('.ex-card');
+    if (!card) return;
+    const ex = EXAMPLES[parseInt(card.dataset.idx, 10)];
+    if (!ex) return;
+    const input = document.getElementById('chatInput');
+    if (input) { input.value = ex.prompt; input.focus(); }
+});
+
+// ─────────────────────────────────────────────────
+// PERPS tab
+// ─────────────────────────────────────────────────
+let perpsData = null;   // {tickers, markets}
+let perpsSymbol = 'SOL';
+let perpsBook = null;   // orderbook
+let perpsCandles = [];  // candle array
+
+function buildPerpsTab() {
+    return `
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">📈 Phoenix Perpetuals — Live Markets</div>
+            <button class="act-btn" style="padding:5px 14px;font-size:11px;" onclick="loadPerpsData()">⟳ REFRESH</button>
+        </div>
+        <div id="perpsMarketsBody">
+            <div style="color:var(--dim);font-size:12px;padding:20px 0;text-align:center;">
+                <span class="spinner"></span>  Loading market data…
+            </div>
+        </div>
+    </div>
+    <div class="panel" id="perpsDetailPanel" style="display:none;">
+        <div class="panel-header">
+            <div class="panel-title" id="perpsDetailTitle">📊 SOL — Orderbook & Candles</div>
+        </div>
+        <div class="ob-grid" id="perpsObGrid"></div>
+        <div style="margin-top:16px;">
+            <div style="font-size:11px;color:var(--dim);letter-spacing:.08em;">1H CANDLES (24)</div>
+            <div class="candle-bar-wrap" id="perpsCandleBar"></div>
+        </div>
+    </div>`;
+}
+
+function buildPerpsSidebar() {
+    const PERPS_EXAMPLES = [
+        { label: '🟢 SOL', sym: 'SOL' },
+        { label: '🟡 BTC', sym: 'BTC' },
+        { label: '🔵 ETH', sym: 'ETH' },
+        { label: '🟣 SUI', sym: 'SUI' },
+        { label: '🐶 DOGE', sym: 'DOGE' },
+        { label: '💨 FARTCOIN', sym: 'FARTCOIN' },
+        { label: '🪐 JUP', sym: 'JUP' },
+        { label: '🔥 HYPE', sym: 'HYPE' },
+    ];
+    return `
+    <div style="font-size:12px;color:var(--dim);margin-bottom:12px;letter-spacing:.08em;">📈 MARKETS</div>
+    ${PERPS_EXAMPLES.map(m => `
+    <div class="ex-card" onclick="selectPerpsSymbol('${m.sym}')" style="padding:9px 12px;">
+        <div class="ex-title" style="font-size:12px;">${m.label}</div>
+        <div id="sideTickerPrice_${m.sym}" style="font-size:11px;color:var(--text2);">—</div>
+    </div>`).join('')}
+    <div style="margin-top:12px;padding:10px;background:rgba(0,255,249,0.04);border:1px solid var(--border);border-radius:6px;font-size:10px;color:var(--dim);line-height:1.7;">
+        ⚡ Powered by Phoenix Perps<br>
+        Data via Vulcan CLI → HTTP fallback<br>
+        FIFO orderbook · Up to 50× leverage
+    </div>`;
+}
+
+function fmt(n, decimals=2) {
+    if (n == null || isNaN(n)) return '—';
+    return Number(n).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+function fmtK(n) {
+    if (!n) return '—';
+    if (n >= 1e9) return '$' + fmt(n/1e9,2) + 'B';
+    if (n >= 1e6) return '$' + fmt(n/1e6,2) + 'M';
+    if (n >= 1e3) return '$' + fmt(n/1e3,2) + 'K';
+    return '$' + fmt(n,2);
+}
+
+function fmtFunding(rate) {
+    if (!rate) return '—';
+    const apr = rate * 24 * 365 * 100;
+    return (apr >= 0 ? '+' : '') + apr.toFixed(4) + '% APR';
+}
+
+function changeClass(pct) {
+    if (!pct) return 'neu';
+    return pct > 0 ? 'pos' : pct < 0 ? 'neg' : 'neu';
+}
+
+function renderMarketsTable(tickers) {
+    if (!tickers || tickers.length === 0) {
+        return '<div style="color:var(--pink);font-size:12px;padding:12px;">⚠️ No market data available. Is the server running?</div>';
+    }
+    const rows = tickers.map(t => {
+        const chg = t.change24hPct ?? 0;
+        const cls = changeClass(chg);
+        return `
+        <tr onclick="selectPerpsSymbol('${t.symbol}')" style="cursor:pointer;">
+            <td>${t.symbol}</td>
+            <td>$${fmt(t.markPrice, t.markPrice > 100 ? 2 : 4)}</td>
+            <td class="${cls}">${chg >= 0 ? '+' : ''}${fmt(chg,2)}%</td>
+            <td>${fmtK(t.volume24hUsd)}</td>
+            <td>${fmtK(t.openInterest * t.markPrice)}</td>
+            <td class="${t.fundingRate >= 0 ? 'pos' : 'neg'}">${fmtFunding(t.fundingRate)}</td>
+        </tr>`;
+    }).join('');
+
+    return `
+    <table class="perps-table">
+        <thead>
+            <tr>
+                <th>MARKET</th>
+                <th>MARK PRICE</th>
+                <th>24H %</th>
+                <th>24H VOLUME</th>
+                <th>OPEN INT.</th>
+                <th>FUNDING APR</th>
+            </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+    </table>
+    <div style="font-size:10px;color:var(--dim);margin-top:8px;">Click a row to view orderbook & candles</div>`;
+}
+
+async function loadPerpsData() {
+    const body = document.getElementById('perpsMarketsBody');
+    if (!body) return;
+    body.innerHTML = '<div style="color:var(--dim);font-size:12px;padding:20px 0;text-align:center;"><span class="spinner"></span>  Loading…</div>';
+
+    try {
+        const r = await fetch(API_BASE + '/api/perps/markets');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        perpsData = await r.json();
+        body.innerHTML = renderMarketsTable(perpsData.tickers ?? []);
+
+        // Update sidebar prices
+        for (const t of (perpsData.tickers ?? [])) {
+            const el = document.getElementById(`sideTickerPrice_${t.symbol}`);
+            if (el) {
+                const chg = t.change24hPct ?? 0;
+                const cls = chg >= 0 ? 'pos' : 'neg';
+                el.innerHTML = `<span style="color:var(--cyan);">$${fmt(t.markPrice, t.markPrice > 100 ? 2 : 4)}</span> <span class="${cls}">${chg >= 0 ? '+' : ''}${fmt(chg,2)}%</span>`;
+            }
+        }
+    } catch (e) {
+        body.innerHTML = `<div class="banner error">⚠️ Failed to load markets: ${e.message}</div>`;
+    }
+}
+
+async function selectPerpsSymbol(sym) {
+    perpsSymbol = sym;
+    const panel = document.getElementById('perpsDetailPanel');
+    const title = document.getElementById('perpsDetailTitle');
+    const obGrid = document.getElementById('perpsObGrid');
+    const candleBar = document.getElementById('perpsCandleBar');
+    if (!panel || !title || !obGrid || !candleBar) return;
+
+    panel.style.display = 'block';
+    title.textContent = `📊 ${sym} — Orderbook & Candles`;
+    obGrid.innerHTML = '<div style="color:var(--dim);font-size:12px;"><span class="spinner"></span>  Loading orderbook…</div>';
+    candleBar.innerHTML = '';
+
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Load orderbook and candles in parallel
+    const [bookRes, candleRes] = await Promise.allSettled([
+        fetch(`${API_BASE}/api/perps/orderbook?symbol=${sym}&depth=8`).then(r => r.json()),
+        fetch(`${API_BASE}/api/perps/candles?symbol=${sym}&interval=1h&limit=24`).then(r => r.json()),
+    ]);
+
+    // Render orderbook
+    if (bookRes.status === 'fulfilled') {
+        perpsBook = bookRes.value;
+        obGrid.innerHTML = renderOrderbook(perpsBook);
+    } else {
+        obGrid.innerHTML = '<div style="color:var(--pink);font-size:12px;">⚠️ Orderbook unavailable</div>';
+    }
+
+    // Render candles
+    if (candleRes.status === 'fulfilled') {
+        perpsCandles = candleRes.value.candles ?? [];
+        candleBar.innerHTML = renderCandleBar(perpsCandles);
+    } else {
+        candleBar.innerHTML = '<div style="color:var(--dim);font-size:11px;">No candle data</div>';
+    }
+}
+
+function renderOrderbook(book) {
+    if (!book || (!book.bids?.length && !book.asks?.length)) {
+        return '<div style="color:var(--dim);font-size:12px;">No orderbook data</div>';
+    }
+    const bidsHtml = (book.bids ?? []).slice(0,8).map(l => `
+        <div class="ob-row">
+            <span class="ob-row-price">${fmt(l.price,4)}</span>
+            <span style="color:var(--text2);">${fmt(l.quantity,4)}</span>
+        </div>`).join('');
+
+    const asksHtml = (book.asks ?? []).slice(0,8).map(l => `
+        <div class="ob-row">
+            <span class="ob-row-price">${fmt(l.price,4)}</span>
+            <span style="color:var(--text2);">${fmt(l.quantity,4)}</span>
+        </div>`).join('');
+
+    const mid = book.midPrice ? `$${fmt(book.midPrice,4)}` : '—';
+    const spread = book.spread ? `${fmt(book.spread,4)}` : '—';
+
+    return `
+    <div class="ob-side ob-bid">
+        <div class="ob-side-title">🟢 BIDS (buy)</div>
+        ${bidsHtml || '<div style="color:var(--dim);font-size:11px;">none</div>'}
+    </div>
+    <div class="ob-side ob-ask">
+        <div class="ob-side-title">🔴 ASKS (sell)</div>
+        ${asksHtml || '<div style="color:var(--dim);font-size:11px;">none</div>'}
+    </div>
+    <div style="grid-column:span 2;padding-top:8px;font-size:11px;color:var(--dim);">
+        Mid: <span style="color:var(--cyan);">${mid}</span>
+        &nbsp;|&nbsp; Spread: <span style="color:var(--yellow);">${spread}</span>
+    </div>`;
+}
+
+function renderCandleBar(candles) {
+    if (!candles || candles.length === 0) return '<div style="color:var(--dim);font-size:11px;">No candle data</div>';
+    const highs = candles.map(c => Number(c.high) || 0);
+    const lows  = candles.map(c => Number(c.low)  || 0);
+    const maxH  = Math.max(...highs);
+    const minL  = Math.min(...lows);
+    const range = maxH - minL || 1;
+
+    return candles.map(c => {
+        const open  = Number(c.open)  || 0;
+        const close = Number(c.close) || 0;
+        const high  = Number(c.high)  || 0;
+        const low   = Number(c.low)   || 0;
+        const bull  = close >= open;
+        const heightPct = Math.max(((high - low) / range) * 100, 4);
+        const color = bull ? 'var(--green)' : 'var(--pink)';
+        const title = `O:${fmt(open,2)} H:${fmt(high,2)} L:${fmt(low,2)} C:${fmt(close,2)}\n${c.time ?? ''}`;
+        return `<div class="candle-bar" title="${title}" style="height:${heightPct}%;background:${color};opacity:0.8;"></div>`;
+    }).join('');
+}
+
+// ─────────────────────────────────────────────────
+// Docs tab
+// ─────────────────────────────────────────────────
+const DOCS = [
+    {
+        title: '🌑 Protocol Overview',
+        body: `Dark Protocol is a privacy-first DeFi metaprotocol on Solana combining:
+
+• Zcash Sapling Cryptography — battle-tested privacy primitives
+• Fully Homomorphic Encryption — compute on encrypted data without decryption
+• Zero-Knowledge Proofs — prove statements without revealing information
+• TEE-Secured AI Agents — autonomous trading in Trusted Execution Environments
+• Cross-Chain Bridge — one-transaction deposits from any blockchain
+
+Program IDs (Devnet):
+• Dark Protocol:    3KWLFYco7T2rUZkzjSSthjHGmbWmo9HAsRmvupDTomGC
+• Shielded Wallet:  4753b1cCrPzwr7taWWD8yrcM8dc98fTR7wCFdv1TsAbg`
+    },
+    {
+        title: '🔒 Privacy Guarantees',
+        body: `Hidden from the network:
+• Sender identity      — unlinkable addresses
+• Receiver identity    — unlinkable addresses
+• Transfer amounts     — ChaCha20-Poly1305 encrypted
+• Transaction graph    — ephemeral accounts
+• Wallet balances      — FHE encrypted
+
+Visible on-chain (reveals nothing):
+• Nullifiers           — random hashes preventing double-spend
+• Commitments          — random hashes hiding note values
+• ZK proofs            — prove validity without any data exposure
+• Merkle roots         — public tree state
+
+Privacy level: Zcash Sapling-grade with information-theoretic unlinkability`
+    },
+    {
+        title: '🏗️ Architecture',
+        body: `Layer 1 — Cryptographic Foundation
+  Zcash Sapling/Orchard · Groth16 SNARKs · Pedersen commitments
+  ChaCha20-Poly1305 · ZIP-32 HD derivation · BLAKE2b
+
+Layer 2 — Encrypted Assets
+  eSOL · eBTC · eETH · eUSDC
+  Threshold ElGamal · FHE balance tracking
+
+Layer 3 — Dark Pools
+  Hidden liquidity · MEV-resistant matching · FHE AMM
+
+Layer 4 — AI Agents
+  TEE attestation · on-chain inference · encrypted model params`
+    },
+    {
+        title: '🔐 Security Model',
+        body: `Cryptographic assumptions:
+• BLAKE2b collision resistance
+• Curve25519 discrete log hardness
+• Ring-LWE hardness (FHE)
+• zk-SNARK soundness (Groth16)
+
+Attack resistance:
+✓ Double-spend: prevented by nullifiers
+✓ Inflation: balance equations verified by ZK proof
+✓ Replay: anchored to current Merkle root
+✓ MEV/frontrunning: orders submitted encrypted
+
+Trust model:
+✓ Open-source, auditable
+✓ No trusted setup
+✓ No centralized coordinator
+✗ No backdoors or master keys`
+    }
+];
+
+function buildDocsTab() {
+    return DOCS.map(d => `
+    <div class="panel doc-block">
+        <h3 style="color:var(--cyan);margin-bottom:10px;">${d.title}</h3>
+        <p style="color:var(--text2);font-size:13px;line-height:1.7;white-space:pre-line;">${d.body}</p>
+    </div>`).join('');
+}
+
+// ─────────────────────────────────────────────────
+// Stats tab
+// ─────────────────────────────────────────────────
+function buildStatsTab() {
+    const net = serverConfig?.network ?? 'devnet';
+    return `
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">📊 Protocol Stats</div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat">
+                <div class="stat-label">PROGRAM ID</div>
+                <div class="stat-value" style="font-size:13px;">3KWL…mGC</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">NETWORK</div>
+                <div class="stat-value">${net.toUpperCase()}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">PRIVACY</div>
+                <div class="stat-value" style="font-size:16px;">ZCASH</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">COMPUTE</div>
+                <div class="stat-value" style="font-size:16px;">FHE</div>
+            </div>
+        </div>
+        <div class="act-grid">
+            <button class="act-btn" onclick="triggerExample('shielded wallet integration')">🛡️ Shielded Wallet</button>
+            <button class="act-btn" onclick="triggerExample('private transfer encryption')">🔒 Private Transfer</button>
+            <button class="act-btn" onclick="triggerExample('dark pool MEV protection')">🌑 Dark Pool Trade</button>
+            <button class="act-btn" onclick="triggerExample('TEE AI agent deployment')">🤖 Deploy Agent</button>
+        </div>
+    </div>`;
+}
+
+function buildPrivacyPanel() {
+    return `
+    <div class="panel">
+        <div class="panel-header"><div class="panel-title">🔒 Privacy Status</div></div>
+        <div class="doc-block" style="margin-bottom:14px;">
+            <h3 style="font-size:12px;color:var(--cyan);margin-bottom:8px;">HIDDEN</h3>
+            ${['Sender identity (unlinkable)','Receiver identity (unlinkable)','Transfer amounts (encrypted)','Wallet balances (FHE)','Transaction graph (ephemeral)'].map(l => `<p style="font-size:12px;color:var(--text2);padding:3px 0;">▹ ${l}</p>`).join('')}
+        </div>
+        <div class="doc-block">
+            <h3 style="font-size:12px;color:var(--cyan);margin-bottom:8px;">VISIBLE</h3>
+            ${['Nullifiers (random hashes)','Commitments (random hashes)','ZK proofs (no data revealed)','Merkle roots (tree state)'].map(l => `<p style="font-size:12px;color:var(--dim);padding:3px 0;">▸ ${l}</p>`).join('')}
+        </div>
+        <div class="banner ok" style="margin-top:12px;">✓ Zcash-grade privacy · Solana speed</div>
+    </div>`;
+}
+
+function triggerExample(prompt) {
+    document.querySelector('[data-tab="agent"]').click();
+    setTimeout(() => {
+        const input = document.getElementById('chatInput');
+        if (input) { input.value = prompt; input.focus(); }
+    }, 50);
+}
+
+// ─────────────────────────────────────────────────
+// Config tab
+// ─────────────────────────────────────────────────
+function buildConfigTab() {
+    const cfg = serverConfig;
+    if (!cfg) return `<div class="banner error">⚠️ Cannot reach local server at ${API_BASE}<br><br>Make sure you started the server with <code>npm run serve</code></div>`;
+
+    const row = (k, v, ok) => `
+    <div class="cfg-row">
+        <span class="cfg-key">${k}</span>
+        <span class="${ok ? 'cfg-ok' : 'cfg-miss'}">${v}</span>
+    </div>`;
+
+    let aiProvider;
+    if (cfg.hasGoogleAI) {
+        aiProvider = 'Google Gemini ✅';
+    } else if (cfg.hasXAI) {
+        aiProvider = 'XAI Grok ✅';
+    } else if (cfg.hasRedPill) {
+        const teeLabel = cfg.redpillTee ? ' 🔐 TEE' : '';
+        aiProvider = `RedPill ✅ — ${cfg.redpillModel ?? ''}${teeLabel}`;
+    } else {
+        aiProvider = '❌ not configured';
+    }
+
+    const redpillRow = cfg.hasRedPill
+        ? row('REDPILL MODEL', `${cfg.redpillModel ?? '—'}${cfg.redpillTee ? ' (GPU TEE 🔐)' : ''}`, true)
+        : row('REDPILL_API_KEY', '⚠️ optional — set REDPILL_MODEL for model choice', false);
+
+    return `
+    <div class="panel" style="max-width:700px;">
+        <div class="panel-header"><div class="panel-title">⚙️ Server Configuration</div></div>
+        <div class="banner ok">✅ Connected to local server — API keys are server-side only, never exposed to the browser</div>
+        ${row('NETWORK', cfg.network ?? 'devnet', true)}
+        ${row('HELIUS_API_KEY', cfg.hasHelius ? '✅ configured' : '❌ missing (required)', cfg.hasHelius)}
+        ${row('AI PROVIDER', aiProvider, cfg.hasGoogleAI || cfg.hasXAI || cfg.hasRedPill)}
+        ${redpillRow}
+        ${row('JUPITER_API_KEY', cfg.hasJupiter ? '✅ configured' : '⚠️ optional', cfg.hasJupiter)}
+        ${cfg.heliusRpcUrl ? row('HELIUS_RPC_URL', cfg.heliusRpcUrl, true) : ''}
+        ${row('PHOENIX PERPS', '✅ live (Vulcan CLI + HTTP fallback)', true)}
+    </div>
+    <div class="panel" style="max-width:700px;">
+        <div class="panel-header"><div class="panel-title">🔐 RedPill Privacy Gateway</div></div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.8;">
+            <p>RedPill routes all AI requests through a <strong style="color:var(--cyan);">TEE-protected gateway</strong>.</p>
+            <p style="margin-top:8px;">Available models:</p>
+            <div style="margin:8px 0 0 0;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                ${[
+                    ['phala/qwen3.5-27b', '🔐 Phala GPU TEE'],
+                    ['z-ai/glm-5.1', '🔐 Chutes GPU TEE'],
+                    ['z-ai/glm-5', '🔐 Near AI GPU TEE'],
+                    ['anthropic/claude-sonnet-4.5', '🤖 Claude Sonnet'],
+                    ['openai/gpt-5', '🤖 GPT-5'],
+                    ['openai/gpt-5-mini', '🤖 GPT-5 Mini'],
+                ].map(([m, l]) => `<div style="background:rgba(0,0,0,0.3);padding:5px 8px;border-radius:4px;border:1px solid var(--border);">
+                    <div style="color:var(--cyan);font-size:10px;">${l}</div>
+                    <div style="color:var(--dim);font-size:10px;">${m}</div>
+                </div>`).join('')}
+            </div>
+            <p style="margin-top:10px;color:var(--dim);font-size:11px;">Set <code>REDPILL_MODEL=phala/qwen3.5-27b</code> in .env for TEE inference, or <code>REDPILL_TEE=1</code> to auto-select.</p>
+        </div>
+    </div>
+    <div class="panel" style="max-width:700px;">
+        <div class="panel-header"><div class="panel-title">📋 Setup Instructions</div></div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.8;">
+            <p style="margin-bottom:8px;">1. Copy <code>.env.example</code> → <code>.env</code> in packages/terminal/</p>
+            <p style="margin-bottom:8px;">2. Fill in your API keys (Helius required, AI key for chat)</p>
+            <p style="margin-bottom:8px;">3. Run <code>npm run serve</code> to start this local server</p>
+            <p style="margin-bottom:8px;">4. Open <code>http://localhost:3333</code> in your browser</p>
+            <p style="color:var(--pink);">⚠️ Never commit .env — it's in .gitignore</p>
+        </div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────
+// Start
+// ─────────────────────────────────────────────────
+boot();
+</script>
+</body>
+</html>
